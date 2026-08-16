@@ -50,7 +50,11 @@ jobs:
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project found at: $PROJECT_DIR"
-
+- name: Show MainActivity
+  run: |
+    FILE=$(find "$PROJECT_DIR" -type f -name "MainActivity.kt" | head -1)
+    echo "MainActivity: $FILE"
+    nl -ba "$FILE" | sed -n '100,140p'
       - name: Fix Android build configuration
         run: |
           echo "Project directory: $PROJECT_DIR"
