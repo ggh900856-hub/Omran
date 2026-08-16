@@ -3,7 +3,8 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build:
@@ -19,30 +20,50 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
       - name: Extract Android project
         run: |
-          unzip -q Omran-Android-Source-Background.zip
-          echo "Files extracted:"
-          find . -maxdepth 3 -name gradlew -type f
+          mkdir android-project
+          unzip -q *.zip -d android-project
+          echo "Extracted files:"
+          find android-project -maxdepth 3 -type f | head -50
 
-      - name: Find Gradle project
+      - name: Find project
         run: |
-          GRADLEW=$(find . -type f -name gradlew | head -n 1)
-          if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew not found"
+          SETTINGS=$(find android-project -type f -name "settings.gradle.kts" -o -name "settings.gradle" | head -n 1)
+
+          if [ -z "$SETTINGS" ]; then
+            echo "ERROR: Android project not found"
             exit 1
           fi
-          PROJECT_DIR=$(dirname "$GRADLEW")
+
+          PROJECT_DIR=$(dirname "$SETTINGS")
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          chmod +x "$GRADLEW"
+          echo "Project found at: $PROJECT_DIR"
 
       - name: Build APK
         run: |
           cd "$PROJECT_DIR"
-          ./gradlew assembleDebug
+          gradle assembleDebug --no-daemon
+
+      - name: Find APK
+        run: |
+          APK=$(find "$PROJECT_DIR" -type f -name "*.apk" | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: APK not found"
+            exit 1
+          fi
+
+          echo "APK found: $APK"
+          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Omran-APK
-          path: '**/app/build/outputs/apk/debug/*.apk'
+          path: ${{ env.APK_PATH }}
