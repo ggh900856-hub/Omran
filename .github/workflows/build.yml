@@ -55,7 +55,7 @@ jobs:
     FILE=$(find "$PROJECT_DIR" -type f -name "MainActivity.kt" | head -1)
     echo "MainActivity: $FILE"
     nl -ba "$FILE" | sed -n '100,140p'
-      - name: Fix Android build configuration
+  - name: Fix Android build configuration
         run: |
           echo "Project directory: $PROJECT_DIR"
 
