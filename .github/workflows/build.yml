@@ -44,7 +44,10 @@ jobs:
           PROJECT_DIR=$(dirname "$SETTINGS")
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project found at: $PROJECT_DIR"
-
+      - name: Fix compileSdk
+        run: |
+          sed -i 's/compileSdk = [0-9]*/compileSdk = 36/' "$PROJECT_DIR"/app/build.gradle.kts
+          sed -i 's/compileSdk [0-9]*/compileSdk 36/' "$PROJECT_DIR"/app/build.gradle
       - name: Build APK
         run: |
           cd "$PROJECT_DIR"
