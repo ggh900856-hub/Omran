@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -23,18 +24,22 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: '8.11.1'
 
       - name: Extract Android project
         run: |
-          mkdir android-project
+          mkdir -p android-project
           unzip -q *.zip -d android-project
+
           echo "Extracted files:"
-          find android-project -maxdepth 3 -type f | head -50
+          find android-project -maxdepth 3 -type f | head -100
 
       - name: Find project
         run: |
-          SETTINGS=$(find android-project -type f -name "settings.gradle.kts" -o -name "settings.gradle" | head -n 1)
+          SETTINGS=$(find android-project -type f \( \
+            -name "settings.gradle" -o \
+            -name "settings.gradle.kts" \
+          \) | head -1)
 
           if [ -z "$SETTINGS" ]; then
             echo "ERROR: Android project not found"
@@ -42,9 +47,65 @@ jobs:
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS")
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project found at: $PROJECT_DIR"
-      
+
+      - name: Fix Android build configuration
+        run: |
+          echo "Project directory: $PROJECT_DIR"
+
+          echo "Before changes:"
+          grep -RIn \
+            -E 'com.android.application|com.android.library|compileSdk|compileSdkVersion|8\.6\.1' \
+            "$PROJECT_DIR" \
+            --include="*.gradle" \
+            --include="*.gradle.kts" \
+            --include="*.toml" \
+            2>/dev/null || true
+
+          # Update Android Gradle Plugin 8.6.1 -> 8.10.0
+          find "$PROJECT_DIR" -type f \( \
+            -name "*.gradle" -o \
+            -name "*.gradle.kts" -o \
+            -name "*.toml" \
+          \) -print0 | while IFS= read -r -d '' file; do
+
+            sed -i \
+              -E 's/(com\.android\.(application|library)[^"]*version[[:space:]]*[=]?[[:space:]]*["'\''])8\.6\.1(["'\''])/\18.10.0\2/g' \
+              "$file" 2>/dev/null || true
+
+            sed -i \
+              -E 's/(agp[[:space:]]*=[[:space:]]*["'\''])8\.6\.1(["'\''])/\18.10.0\2/g' \
+              "$file" 2>/dev/null || true
+
+          done
+
+          # Force compileSdk 36
+          find "$PROJECT_DIR" -type f \( \
+            -name "build.gradle" -o \
+            -name "build.gradle.kts" \
+          \) -print0 | while IFS= read -r -d '' file; do
+
+            sed -i -E \
+              's/(compileSdk[[:space:]]*[=]?[[:space:]]*)[0-9]+/\136/g' \
+              "$file" 2>/dev/null || true
+
+            sed -i -E \
+              's/(compileSdkVersion[[:space:]]+)[0-9]+/\136/g' \
+              "$file" 2>/dev/null || true
+
+          done
+
+          echo "After changes:"
+          grep -RIn \
+            -E 'com.android.application|com.android.library|compileSdk|compileSdkVersion|8\.10\.0' \
+            "$PROJECT_DIR" \
+            --include="*.gradle" \
+            --include="*.gradle.kts" \
+            --include="*.toml" \
+            2>/dev/null || true
+
       - name: Build APK
         run: |
           cd "$PROJECT_DIR"
@@ -52,7 +113,7 @@ jobs:
 
       - name: Find APK
         run: |
-          APK=$(find "$PROJECT_DIR" -type f -name "*.apk" | head -n 1)
+          APK=$(find "$PROJECT_DIR" -type f -name "*.apk" | head -1)
 
           if [ -z "$APK" ]; then
             echo "ERROR: APK not found"
@@ -65,5 +126,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Omran-APK
+          name: Android-APK
           path: ${{ env.APK_PATH }}
+          if-no-files-found: error
